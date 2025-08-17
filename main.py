@@ -17,9 +17,19 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # DB Setup: Use Render's DATABASE_URL or fallback to SQLite for local testing
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///cardb.db')  # Fallback to SQLite if no Render DB
+# DB Setup: Use Render's DATABASE_URL or fallback to SQLite for local testing
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///cardb.db')
+
+# Fix for Render: Rewrite 'postgres://' to 'postgresql+psycopg://' to explicitly use psycopg3
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql+psycopg://', 1)
+
 try:
-    ENGINE = create_engine(DATABASE_URL, connect_args={'check_same_thread': False} if 'sqlite' in DATABASE_URL else {})
+    ENGINE = create_engine(
+        DATABASE_URL,
+        connect_args={'check_same_thread': False} if 'sqlite' in DATABASE_URL else {},
+        pool_pre_ping=True  # Add this to handle potential connection timeouts/closures on Render
+    )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=ENGINE)
     Base.metadata.create_all(bind=ENGINE)
     logger.info(f"Connected to database: {DATABASE_URL}")
